@@ -1,23 +1,35 @@
 package com.travessia.segura.ui
 
+import android.graphics.Color
+import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
+import android.view.Gravity
+import android.view.View
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
 import com.travessia.segura.config.AppConfig
-import android.view.View
+import com.travessia.segura.config.LanguageManager
 
 class SettingsActivity : AppCompatActivity() {
 
     private lateinit var config: AppConfig
     private lateinit var container: LinearLayout
 
+    private val dp: Float
+        get() = resources.displayMetrics.density
+
+    private fun tr(key: String): String = LanguageManager.text(this, key)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        window.statusBarColor = Color.parseColor("#050B18")
 
         config = AppConfig(this)
 
         val scrollView = ScrollView(this).apply {
-            setPadding(32, 32, 32, 32)
+            setBackgroundColor(Color.parseColor("#050B18"))
+            setPadding(dpInt(18), dpInt(18), dpInt(18), dpInt(24))
         }
 
         container = LinearLayout(this).apply {
@@ -28,135 +40,204 @@ class SettingsActivity : AppCompatActivity() {
             )
         }
 
-        // ── Título ──
-        addTitle("⚙ CONFIGURAÇÕES")
+        addHeader()
 
-        // ── Detecção ──
-        addSection("DETECÇÃO")
-        addSliderFloat("Confiança Mínima", config.confMinima, 0.05f, 0.95f, 0.05f) {
+        addSection(tr("settings_language_section"), tr("settings_language_subtitle"))
+        addLanguageSpinner()
+
+        addSection(tr("settings_appearance_section"), tr("settings_appearance_subtitle"))
+        addSwitch(tr("settings_esp_fullscreen"), config.espPreviewTelaCheia) {
+            config.espPreviewTelaCheia = it
+        }
+        addSpinnerInt(tr("settings_esp_rotation"), config.espPreviewRotation, listOf(0, 90, 180, 270)) {
+            config.espPreviewRotation = it
+        }
+        addSwitch(tr("settings_show_boxes"), config.mostrarOverlay) {
+            config.mostrarOverlay = it
+        }
+        addSwitch(tr("settings_show_top_panel"), config.mostrarPainelSuperior) {
+            config.mostrarPainelSuperior = it
+        }
+        addSwitch(tr("settings_show_bottom_panel"), config.mostrarPainelInferior) {
+            config.mostrarPainelInferior = it
+        }
+
+        addSection(tr("settings_ai_section"), tr("settings_ai_subtitle"))
+        addSliderFloat(tr("settings_confidence"), config.confMinima, 0.05f, 0.95f, 0.05f) {
             config.confMinima = it
         }
-        addSpinnerInt("Tamanho Inferência", config.inferenciaTamanho,
-            listOf(160, 224, 320, 416, 640)
-        ) {
+        addSpinnerInt(tr("settings_inference_size"), config.inferenciaTamanho, listOf(160, 224, 320, 416, 640)) {
             config.inferenciaTamanho = it
         }
-        addSliderInt("Histórico Máx", config.historicoMax, 5, 60) {
+        addSliderInt(tr("settings_history"), config.historicoMax, 5, 60) {
             config.historicoMax = it
         }
 
-        // ── Velocidades ──
-        addSection("VELOCIDADES (px/s)")
-        addSliderFloat("Vel. Parado", config.velParadoPxs, 5f, 50f, 1f) {
+        addSection(tr("settings_traffic_section"), tr("settings_traffic_subtitle"))
+        addSliderFloat(tr("settings_stopped_speed"), config.velParadoPxs, 5f, 50f, 1f) {
             config.velParadoPxs = it
         }
-        addSliderFloat("Vel. Aproximando", config.velAproximandoPxs, 10f, 80f, 1f) {
+        addSliderFloat(tr("settings_approaching_speed"), config.velAproximandoPxs, 10f, 80f, 1f) {
             config.velAproximandoPxs = it
         }
-
-        // ── Proximidade ──
-        addSection("PROXIMIDADE")
-        addSliderFloat("Limiar Próximo", config.limiarProximoPct, 0.10f, 0.60f, 0.02f) {
+        addSliderFloat(tr("settings_proximity"), config.limiarProximoPct, 0.10f, 0.60f, 0.02f) {
             config.limiarProximoPct = it
         }
 
-        // ── Lógica / Tempos ──
-        addSection("TEMPOS E LÓGICA")
-        addSliderFloat("Tempo Reconhecimento", config.tempoRecon, 1f, 10f, 0.5f) {
+        addSection(tr("settings_time_section"), tr("settings_time_subtitle"))
+        addSliderFloat(tr("settings_recognition_time"), config.tempoRecon, 1f, 10f, 0.5f) {
             config.tempoRecon = it
         }
-        addSliderFloat("Tempo Parado Seguro", config.tempoParadoSeguro, 1f, 10f, 0.5f) {
+        addSliderFloat(tr("settings_safe_stop_time"), config.tempoParadoSeguro, 1f, 10f, 0.5f) {
             config.tempoParadoSeguro = it
         }
-        addSliderFloat("Recon Threshold", config.reconThreshold, 0.05f, 0.80f, 0.05f) {
+        addSliderFloat(tr("settings_recon_threshold"), config.reconThreshold, 0.05f, 0.80f, 0.05f) {
             config.reconThreshold = it
         }
-        addSliderFloat("Recon Early Threshold", config.reconEarlyThreshold, 0.10f, 0.90f, 0.05f) {
+        addSliderFloat(tr("settings_recon_early_threshold"), config.reconEarlyThreshold, 0.10f, 0.90f, 0.05f) {
             config.reconEarlyThreshold = it
         }
-        addSliderInt("Recon Early Min Frames", config.reconEarlyMinFrames, 5, 60) {
+        addSliderInt(tr("settings_recon_early_min_frames"), config.reconEarlyMinFrames, 5, 60) {
             config.reconEarlyMinFrames = it
         }
-        addSliderInt("Upgrade Frames", config.upgradeFrames, 3, 30) {
+        addSliderInt(tr("settings_upgrade_frames"), config.upgradeFrames, 3, 30) {
             config.upgradeFrames = it
         }
 
-        // ── ROI ──
-        addSection("REGIÃO DE INTERESSE (ROI)")
-        addSwitch("ROI Ativo", config.roiAtivo) { config.roiAtivo = it }
-        addSliderFloat("ROI Top", config.roiTop, 0f, 0.50f, 0.01f) {
+        addSection(tr("settings_roi_section"), tr("settings_roi_subtitle"))
+        addSwitch(tr("settings_roi_active"), config.roiAtivo) {
+            config.roiAtivo = it
+        }
+        addSliderFloat(tr("settings_roi_top"), config.roiTop, 0f, 0.50f, 0.01f) {
             config.roiTop = it
         }
-        addSliderFloat("ROI Bottom", config.roiBottom, 0.50f, 1.0f, 0.01f) {
+        addSliderFloat(tr("settings_roi_bottom"), config.roiBottom, 0.50f, 1.0f, 0.01f) {
             config.roiBottom = it
         }
-        addSliderFloat("ROI Left", config.roiLeft, 0f, 0.30f, 0.01f) {
+        addSliderFloat(tr("settings_roi_left"), config.roiLeft, 0f, 0.30f, 0.01f) {
             config.roiLeft = it
         }
-        addSliderFloat("ROI Right", config.roiRight, 0.70f, 1.0f, 0.01f) {
+        addSliderFloat(tr("settings_roi_right"), config.roiRight, 0.70f, 1.0f, 0.01f) {
             config.roiRight = it
         }
 
-        // ── Suavização ──
-        addSection("SUAVIZAÇÃO")
-        addSliderFloat("EMA Alpha", config.emaAlpha, 0.10f, 0.90f, 0.05f) {
+        addSection(tr("settings_smoothing_section"), tr("settings_smoothing_subtitle"))
+        addSliderFloat(tr("settings_ema"), config.emaAlpha, 0.10f, 0.90f, 0.05f) {
             config.emaAlpha = it
         }
-        addSliderInt("Cam Comp Min Objetos", config.cameraCompMinObjetos, 1, 5) {
+        addSliderInt(tr("settings_min_objects"), config.cameraCompMinObjetos, 1, 5) {
             config.cameraCompMinObjetos = it
         }
-        addSliderFloat("Faixa Margem Alinhamento", config.faixaMargemAlinhamento,
-            0.02f, 0.30f, 0.01f
-        ) {
+        addSliderFloat(tr("settings_crosswalk_margin"), config.faixaMargemAlinhamento, 0.02f, 0.30f, 0.01f) {
             config.faixaMargemAlinhamento = it
         }
-
-        // ── Outros ──
-        addSection("OUTROS")
-        addSliderFloat("Heartbeat Interval", config.heartbeatInterval, 2f, 15f, 0.5f) {
+        addSliderFloat(tr("settings_heartbeat"), config.heartbeatInterval, 2f, 15f, 0.5f) {
             config.heartbeatInterval = it
         }
-        addSliderFloat("Volume da Voz", config.volumeVoz, 0.1f, 1.0f, 0.1f) {
+        addSliderFloat(tr("settings_voice_volume"), config.volumeVoz, 0.1f, 1.0f, 0.1f) {
             config.volumeVoz = it
         }
 
-        // ── Botão Reset ──
-        addSection("")
-        val btnReset = Button(this).apply {
-            text = "RESETAR PARA PADRÃO"
-            setOnClickListener {
-                config.resetarParaPadrao()
-                Toast.makeText(this@SettingsActivity,
-                    "Configurações resetadas!", Toast.LENGTH_SHORT).show()
-                recreate()
-            }
-        }
-        container.addView(btnReset)
+        addResetButton()
 
         scrollView.addView(container)
         setContentView(scrollView)
     }
 
-    // ══════════════════════════════════════════
-    //  HELPERS PARA GERAR UI
-    // ══════════════════════════════════════════
+    private fun addHeader() {
+        val card = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_VERTICAL
+            background = roundedBackground("#12263A", "#1B4A6B", 28f)
+            setPadding(dpInt(20), dpInt(20), dpInt(20), dpInt(20))
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                bottomMargin = dpInt(18)
+            }
+        }
 
-    private fun addTitle(text: String) {
-        container.addView(TextView(this).apply {
-            this.text = text
-            textSize = 22f
-            setPadding(0, 0, 0, 24)
-            setTextColor(0xFFFFFFFF.toInt())
+        card.addView(TextView(this).apply {
+            text = tr("settings_title")
+            textSize = 28f
+            setTextColor(Color.WHITE)
+            setTypeface(Typeface.DEFAULT, Typeface.BOLD)
         })
+
+        card.addView(TextView(this).apply {
+            text = tr("settings_subtitle")
+            textSize = 14f
+            setTextColor(Color.parseColor("#CDE7F4FF"))
+            setPadding(0, dpInt(6), 0, 0)
+        })
+
+        container.addView(card)
     }
 
-    private fun addSection(text: String) {
-        container.addView(TextView(this).apply {
-            this.text = text
-            textSize = 16f
-            setPadding(0, 32, 0, 8)
-            setTextColor(0xFF90CAF9.toInt())
+    private fun addSection(title: String, subtitle: String = "") {
+        val titleView = TextView(this).apply {
+            text = title
+            textSize = 15f
+            letterSpacing = 0.08f
+            setTextColor(Color.parseColor("#63D8FF"))
+            setTypeface(Typeface.DEFAULT, Typeface.BOLD)
+            setPadding(0, dpInt(18), 0, dpInt(4))
+        }
+        container.addView(titleView)
+
+        if (subtitle.isNotBlank()) {
+            container.addView(TextView(this).apply {
+                text = subtitle
+                textSize = 12f
+                setTextColor(Color.parseColor("#9CB6C8"))
+                setPadding(0, 0, 0, dpInt(8))
+            })
+        }
+    }
+
+    private fun addLanguageSpinner() {
+        val options = LanguageManager.options
+        val current = config.appLanguage
+
+        val box = controlBox()
+        box.addView(TextView(this).apply {
+            text = tr("settings_language")
+            textSize = 14f
+            setTextColor(Color.WHITE)
+            setPadding(0, 0, 0, dpInt(8))
         })
+
+        var firstSelection = true
+        val spinner = Spinner(this).apply {
+            adapter = ArrayAdapter(
+                this@SettingsActivity,
+                android.R.layout.simple_spinner_dropdown_item,
+                options.map { it.label }
+            )
+            setSelection(options.indexOfFirst { it.code == current }.coerceAtLeast(0))
+            onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+                override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                    if (firstSelection) {
+                        firstSelection = false
+                        return
+                    }
+
+                    val code = options[position].code
+                    if (code != config.appLanguage) {
+                        config.appLanguage = code
+                        LanguageManager.setLanguage(this@SettingsActivity, code)
+                        Toast.makeText(this@SettingsActivity, tr("settings_language_saved"), Toast.LENGTH_SHORT).show()
+                        recreate()
+                    }
+                }
+
+                override fun onNothingSelected(parent: AdapterView<*>?) {}
+            }
+        }
+
+        box.addView(spinner)
+        container.addView(box)
     }
 
     private fun addSliderFloat(
@@ -170,48 +251,43 @@ class SettingsActivity : AppCompatActivity() {
         val steps = ((max - min) / step).toInt()
         val initialProgress = ((initialValue - min) / step).toInt().coerceIn(0, steps)
 
+        val box = controlBox()
         val tvLabel = TextView(this).apply {
-            text = "$label: %.3f".format(initialValue)
+            text = "$label: %.2f".format(initialValue)
             textSize = 14f
-            setTextColor(0xFFE0E0E0.toInt())
+            setTextColor(Color.WHITE)
         }
-        container.addView(tvLabel)
+        box.addView(tvLabel)
 
         val seekBar = SeekBar(this).apply {
             this.max = steps
             progress = initialProgress
-            setPadding(0, 0, 0, 16)
             setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
                 override fun onProgressChanged(sb: SeekBar?, progress: Int, fromUser: Boolean) {
                     val value = min + progress * step
-                    tvLabel.text = "$label: %.3f".format(value)
+                    tvLabel.text = "$label: %.2f".format(value)
                     onChange(value)
                 }
                 override fun onStartTrackingTouch(sb: SeekBar?) {}
                 override fun onStopTrackingTouch(sb: SeekBar?) {}
             })
         }
-        container.addView(seekBar)
+        box.addView(seekBar)
+        container.addView(box)
     }
 
-    private fun addSliderInt(
-        label: String,
-        initialValue: Int,
-        min: Int,
-        max: Int,
-        onChange: (Int) -> Unit
-    ) {
+    private fun addSliderInt(label: String, initialValue: Int, min: Int, max: Int, onChange: (Int) -> Unit) {
+        val box = controlBox()
         val tvLabel = TextView(this).apply {
             text = "$label: $initialValue"
             textSize = 14f
-            setTextColor(0xFFE0E0E0.toInt())
+            setTextColor(Color.WHITE)
         }
-        container.addView(tvLabel)
+        box.addView(tvLabel)
 
         val seekBar = SeekBar(this).apply {
             this.max = max - min
             progress = initialValue - min
-            setPadding(0, 0, 0, 16)
             setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
                 override fun onProgressChanged(sb: SeekBar?, progress: Int, fromUser: Boolean) {
                     val value = min + progress
@@ -222,21 +298,18 @@ class SettingsActivity : AppCompatActivity() {
                 override fun onStopTrackingTouch(sb: SeekBar?) {}
             })
         }
-        container.addView(seekBar)
+        box.addView(seekBar)
+        container.addView(box)
     }
 
-    private fun addSpinnerInt(
-        label: String,
-        initialValue: Int,
-        options: List<Int>,
-        onChange: (Int) -> Unit
-    ) {
-        val tvLabel = TextView(this).apply {
+    private fun addSpinnerInt(label: String, initialValue: Int, options: List<Int>, onChange: (Int) -> Unit) {
+        val box = controlBox()
+        box.addView(TextView(this).apply {
             text = label
             textSize = 14f
-            setTextColor(0xFFE0E0E0.toInt())
-        }
-        container.addView(tvLabel)
+            setTextColor(Color.WHITE)
+            setPadding(0, 0, 0, dpInt(8))
+        })
 
         val spinner = Spinner(this).apply {
             adapter = ArrayAdapter(
@@ -244,33 +317,76 @@ class SettingsActivity : AppCompatActivity() {
                 android.R.layout.simple_spinner_dropdown_item,
                 options.map { it.toString() }
             )
-            val idx = options.indexOf(initialValue).coerceAtLeast(0)
-            setSelection(idx)
+            setSelection(options.indexOf(initialValue).coerceAtLeast(0))
             onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-                override fun onItemSelected(
-                    parent: AdapterView<*>?, view: View?, position: Int, id: Long
-                ) {
+                override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
                     onChange(options[position])
                 }
                 override fun onNothingSelected(parent: AdapterView<*>?) {}
             }
         }
-        container.addView(spinner)
+        box.addView(spinner)
+        container.addView(box)
     }
 
-    private fun addSwitch(
-        label: String,
-        initialValue: Boolean,
-        onChange: (Boolean) -> Unit
-    ) {
+    private fun addSwitch(label: String, initialValue: Boolean, onChange: (Boolean) -> Unit) {
+        val box = controlBox()
         val switch = Switch(this).apply {
             text = label
             isChecked = initialValue
             textSize = 14f
-            setPadding(0, 8, 0, 16)
-            setTextColor(0xFFE0E0E0.toInt())
+            setTextColor(Color.WHITE)
+            setPadding(0, 0, 0, 0)
             setOnCheckedChangeListener { _, isChecked -> onChange(isChecked) }
         }
-        container.addView(switch)
+        box.addView(switch)
+        container.addView(box)
     }
+
+    private fun addResetButton() {
+        val btnReset = Button(this).apply {
+            text = tr("settings_reset")
+            textSize = 15f
+            setTextColor(Color.WHITE)
+            setTypeface(Typeface.DEFAULT, Typeface.BOLD)
+            background = roundedBackground("#B71C1C", "#D32F2F", 18f)
+            setOnClickListener {
+                config.resetarParaPadrao()
+                Toast.makeText(this@SettingsActivity, tr("settings_reset_done"), Toast.LENGTH_SHORT).show()
+                recreate()
+            }
+        }
+        container.addView(btnReset, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            dpInt(54)
+        ).apply {
+            topMargin = dpInt(24)
+        })
+    }
+
+    private fun controlBox(): LinearLayout {
+        return LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = roundedBackground("#101C2B", "#1C3348", 18f)
+            setPadding(dpInt(14), dpInt(12), dpInt(14), dpInt(12))
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                topMargin = dpInt(8)
+            }
+        }
+    }
+
+    private fun roundedBackground(color1: String, color2: String, radiusDp: Float): GradientDrawable {
+        return GradientDrawable(
+            GradientDrawable.Orientation.LEFT_RIGHT,
+            intArrayOf(Color.parseColor(color1), Color.parseColor(color2))
+        ).apply {
+            cornerRadius = radiusDp * dp
+            setStroke(dpInt(1), Color.parseColor("#30FFFFFF"))
+        }
+    }
+
+    private fun dpInt(value: Int): Int = (value * dp).toInt()
 }

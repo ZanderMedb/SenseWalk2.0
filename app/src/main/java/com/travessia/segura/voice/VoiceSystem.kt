@@ -5,18 +5,14 @@ import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import android.util.Log
 import com.travessia.segura.config.AppConfig
+import com.travessia.segura.config.LanguageManager
 import java.util.Locale
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Sistema de voz com fila e cooldowns por chave.
- *
- * Regras:
- * - falar(chave, texto): respeita cooldown. Se dentro do cooldown, ignora.
- * - forcar(chave, texto): limpa a fila, fala imediatamente. Sempre.
- *
- * Simplificado: sem urgente (emergência foi removida do projeto por ora).
+ * A linguagem do TTS acompanha o idioma escolhido em Configurações/Login.
  */
 class VoiceSystem(
     context: Context,
@@ -25,7 +21,7 @@ class VoiceSystem(
 
     companion object {
         private const val TAG = "VoiceSystem"
-        private const val MAX_QUEUE = 3  // Fila pequena para não atrasar
+        private const val MAX_QUEUE = 3
     }
 
     private var tts: TextToSpeech? = null
@@ -33,12 +29,11 @@ class VoiceSystem(
     private val ultimos = mutableMapOf<String, Double>()
     private val falando = AtomicBoolean(false)
     private var tUltimaFala = now()
+    private var idiomaAtualTts: String = config.appLanguage
 
     var funcionando = false
         private set
 
-    // Cooldowns por chave (segundos)
-    // Mais simples — sem keys de emergência que poluíam a fila
     private val cooldowns = mapOf(
         "inicio"           to 0.0,
         "cancelado"        to 0.0,
@@ -72,12 +67,7 @@ class VoiceSystem(
 
     override fun onInit(status: Int) {
         if (status == TextToSpeech.SUCCESS) {
-            val result = tts?.setLanguage(Locale("pt", "BR"))
-            if (result == TextToSpeech.LANG_MISSING_DATA ||
-                result == TextToSpeech.LANG_NOT_SUPPORTED) {
-                tts?.setLanguage(Locale("pt"))
-                Log.w(TAG, "PT-BR indisponivel, usando PT")
-            }
+            aplicarIdiomaTts(forcar = true)
             tts?.setPitch(1.0f)
             tts?.setSpeechRate(1.1f)
 
@@ -96,9 +86,38 @@ class VoiceSystem(
         }
     }
 
+    private fun localeParaIdioma(code: String): Locale {
+        return when (code) {
+            LanguageManager.EN -> Locale("en", "US")
+            LanguageManager.ES -> Locale("es", "ES")
+            else -> Locale("pt", "BR")
+        }
+    }
+
+    private fun aplicarIdiomaTts(forcar: Boolean = false) {
+        val novoIdioma = config.appLanguage
+        if (!forcar && novoIdioma == idiomaAtualTts) return
+
+        idiomaAtualTts = novoIdioma
+        val localePrincipal = localeParaIdioma(novoIdioma)
+        val result = tts?.setLanguage(localePrincipal)
+
+        if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
+            val fallback = when (novoIdioma) {
+                LanguageManager.EN -> Locale("en")
+                LanguageManager.ES -> Locale("es")
+                else -> Locale("pt")
+            }
+            tts?.setLanguage(fallback)
+            Log.w(TAG, "Idioma TTS $novoIdioma indisponivel, usando fallback ${fallback.language}")
+        }
+    }
+
     /** Fala com cooldown. Se dentro do cooldown, ignora silenciosamente. */
     fun falar(chave: String, texto: String) {
         if (!funcionando) return
+        aplicarIdiomaTts()
+
         val agora = now()
         val cd = cooldowns[chave] ?: 3.0
         if ((agora - (ultimos[chave] ?: 0.0)) < cd) return
@@ -115,6 +134,7 @@ class VoiceSystem(
     /** Força fala imediata — limpa tudo antes. */
     fun forcar(chave: String, texto: String) {
         if (!funcionando) { Log.d(TAG, "[VOZ!] OFF $texto"); return }
+        aplicarIdiomaTts()
         limpar()
         fila.add(texto)
         val agora = now()

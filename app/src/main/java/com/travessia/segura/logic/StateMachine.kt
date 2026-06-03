@@ -139,15 +139,15 @@ class StateMachine(
 
         when {
             ps >= config.reconThreshold -> {
-                voz.forcar("recon_resultado", "Semáforo detectado.")
+                voz.forcar("recon_resultado", config.tr("voice_recon_traffic_light"))
                 entrarEstado(EST_SEMAFORO)
             }
             pf >= config.reconThreshold -> {
-                voz.forcar("recon_resultado", "Faixa de pedestre detectada.")
+                voz.forcar("recon_resultado", config.tr("voice_recon_crosswalk"))
                 entrarEstado(EST_FAIXA)
             }
             else -> {
-                voz.forcar("recon_resultado", "Monitorando a via.")
+                voz.forcar("recon_resultado", config.tr("voice_recon_road"))
                 entrarEstado(EST_VIA_LIVRE)
             }
         }
@@ -173,8 +173,8 @@ class StateMachine(
             // Anunciar mudança de cor
             if (semCorFrame != semCorAnterior && semCorAnterior != "NENHUM") {
                 when (semCorFrame) {
-                    "VERDE"             -> voz.forcar("semaforo_cor", "Semáforo verde!")
-                    "VERMELHO","AMARELO" -> voz.forcar("semaforo_cor", "Semáforo vermelho. Pare.")
+                    "VERDE"             -> voz.forcar("semaforo_cor", config.tr("voice_green_light"))
+                    "VERMELHO","AMARELO" -> voz.forcar("semaforo_cor", config.tr("voice_red_light_stop"))
                 }
             }
             semCorAnterior = semCorFrame
@@ -184,7 +184,7 @@ class StateMachine(
                 "VERMELHO", "AMARELO" -> {
                     situacaoAtual = "AGUARDE"
                     tViaLimpa = null
-                    voz.falar("semaforo_aguarde", "Semáforo vermelho. Aguarde.")
+                    voz.falar("semaforo_aguarde", config.tr("voice_red_light_wait"))
                 }
                 // VERDE: verifica carros
                 "VERDE" -> processarSemaforoVerde(veiculosReais, nSemId, agora)
@@ -195,10 +195,10 @@ class StateMachine(
             if (tSemPerdido == null) tSemPerdido = agora
             if (agora - tSemPerdido!! > 4.0) {
                 if (faixaDet) {
-                    voz.forcar("upgrade", "Semáforo fora de visão. Monitorando faixa.")
+                    voz.forcar("upgrade", config.tr("voice_light_lost_crosswalk"))
                     entrarEstado(EST_FAIXA)
                 } else {
-                    voz.forcar("upgrade", "Semáforo fora de visão. Monitorando via.")
+                    voz.forcar("upgrade", config.tr("voice_light_lost_road"))
                     entrarEstado(EST_VIA_LIVRE)
                 }
             }
@@ -207,9 +207,9 @@ class StateMachine(
         // Heartbeat
         if (voz.tempoSilencio() >= config.heartbeatInterval) {
             val msg = when (semCorFrame) {
-                "VERDE"             -> "Semáforo verde."
-                "VERMELHO","AMARELO" -> "Semáforo vermelho. Aguarde."
-                else                -> "Procurando semáforo."
+                "VERDE"             -> config.tr("voice_green_light")
+                "VERMELHO","AMARELO" -> config.tr("voice_red_light_wait")
+                else                -> config.tr("voice_looking_for_light")
             }
             voz.falar("heartbeat", msg)
         }
@@ -227,7 +227,7 @@ class StateMachine(
             if (tViaLimpa == null) tViaLimpa = agora
             if (agora - tViaLimpa!! >= TEMPO_CONFIRMAR_LIVRE_S) {
                 situacaoAtual = "SEGURO"
-                voz.falar("semaforo_pode", "Semáforo verde. Via livre. Pode atravessar.")
+                voz.falar("semaforo_pode", config.tr("voice_green_road_clear"))
             } else {
                 situacaoAtual = "VERIFICANDO"
             }
@@ -239,7 +239,7 @@ class StateMachine(
         if (temMovimento) {
             tViaLimpa = null
             situacaoAtual = "AGUARDE"
-            voz.falar("semaforo_veiculo", "Semáforo verde, mas há veículos. Aguarde.")
+            voz.falar("semaforo_veiculo", config.tr("voice_green_has_vehicles"))
             return
         }
 
@@ -251,10 +251,10 @@ class StateMachine(
             if (tViaLimpa == null) tViaLimpa = agora
             if (agora - tViaLimpa!! >= TEMPO_CONFIRMAR_PARADO_S) {
                 situacaoAtual = "SEGURO"
-                voz.falar("semaforo_pode", "Semáforo verde. Veículos parados. Pode atravessar.")
+                voz.falar("semaforo_pode", config.tr("voice_green_vehicles_stopped"))
             } else {
                 situacaoAtual = "AGUARDE"
-                voz.falar("semaforo_veiculo", "Semáforo verde. Veículos parando.")
+                voz.falar("semaforo_veiculo", config.tr("voice_green_vehicles_stopping"))
             }
         } else {
             tViaLimpa = null
@@ -278,7 +278,7 @@ class StateMachine(
         upgradeSemCount = if (semCorFrame != "NENHUM") upgradeSemCount + 1
         else maxOf(0, upgradeSemCount - 1)
         if (upgradeSemCount >= config.upgradeFrames) {
-            voz.forcar("upgrade", "Semáforo detectado.")
+            voz.forcar("upgrade", config.tr("voice_recon_traffic_light"))
             entrarEstado(EST_SEMAFORO)
             return
         }
@@ -289,19 +289,19 @@ class StateMachine(
             when (dir) {
                 "ESQUERDA" -> {
                     voz.falar("faixa_alinhamento",
-                        if (intens > 0.35f) "Vire bastante para a esquerda."
-                        else "Vire levemente para a esquerda.")
+                        if (intens > 0.35f) config.tr("voice_turn_left_strong")
+                        else config.tr("voice_turn_left_light"))
                     faixaAlinhada = false
                 }
                 "DIREITA" -> {
                     voz.falar("faixa_alinhamento",
-                        if (intens > 0.35f) "Vire bastante para a direita."
-                        else "Vire levemente para a direita.")
+                        if (intens > 0.35f) config.tr("voice_turn_right_strong")
+                        else config.tr("voice_turn_right_light"))
                     faixaAlinhada = false
                 }
                 "ALINHADO" -> {
                     if (!faixaAlinhada) {
-                        voz.falar("faixa_alinhamento", "Alinhado com a faixa.")
+                        voz.falar("faixa_alinhamento", config.tr("voice_aligned_crosswalk"))
                         faixaAlinhada = true
                     }
                 }
@@ -313,10 +313,10 @@ class StateMachine(
         // Lógica de veículos
         processarLogicaVeiculos(
             veiculosReais, nSemId,
-            msgLivre      = "Faixa livre. Pode atravessar.",
-            msgAguarde    = "Veículos na faixa. Aguarde.",
-            msgParando    = "Veículos parando.",
-            msgPodePassar = "Veículos parados. Pode atravessar pela faixa.",
+            msgLivre      = config.tr("voice_crosswalk_clear"),
+            msgAguarde    = config.tr("voice_crosswalk_wait"),
+            msgParando    = config.tr("voice_vehicles_stopping"),
+            msgPodePassar = config.tr("voice_crosswalk_vehicles_stopped"),
             prefixo       = "faixa"
         )
 
@@ -324,8 +324,8 @@ class StateMachine(
         if (voz.tempoSilencio() >= config.heartbeatInterval) {
             val nMov = veiculosReais.values.count { it.classif != "PARADO" }
             voz.falar("heartbeat",
-                if (nMov > 0) "Monitorando faixa. $nMov veículos em movimento."
-                else "Monitorando faixa.")
+                if (nMov > 0) config.trFormat("voice_monitor_crosswalk_moving", nMov)
+                else config.tr("voice_monitor_crosswalk"))
         }
     }
 
@@ -343,7 +343,7 @@ class StateMachine(
         upgradeSemCount = if (semCorFrame != "NENHUM") upgradeSemCount + 1
         else maxOf(0, upgradeSemCount - 1)
         if (upgradeSemCount >= config.upgradeFrames) {
-            voz.forcar("upgrade", "Semáforo detectado.")
+            voz.forcar("upgrade", config.tr("voice_recon_traffic_light"))
             entrarEstado(EST_SEMAFORO)
             return
         }
@@ -352,17 +352,17 @@ class StateMachine(
         upgradeFaixaCount = if (faixaDet) upgradeFaixaCount + 1
         else maxOf(0, upgradeFaixaCount - 1)
         if (upgradeFaixaCount >= config.upgradeFrames) {
-            voz.forcar("upgrade", "Faixa de pedestre detectada.")
+            voz.forcar("upgrade", config.tr("voice_recon_crosswalk"))
             entrarEstado(EST_FAIXA)
             return
         }
 
         processarLogicaVeiculos(
             veiculosReais, nSemId,
-            msgLivre      = "Via livre. Pode atravessar.",
-            msgAguarde    = "Veículos na via. Aguarde.",
-            msgParando    = "Veículos parando.",
-            msgPodePassar = "Veículos parados. Pode atravessar.",
+            msgLivre      = config.tr("voice_road_clear"),
+            msgAguarde    = config.tr("voice_road_wait"),
+            msgParando    = config.tr("voice_vehicles_stopping"),
+            msgPodePassar = config.tr("voice_road_vehicles_stopped"),
             prefixo       = "via"
         )
 
@@ -370,8 +370,8 @@ class StateMachine(
         if (voz.tempoSilencio() >= config.heartbeatInterval) {
             val nMov = veiculosReais.values.count { it.classif != "PARADO" }
             voz.falar("heartbeat",
-                if (nMov > 0) "Monitorando via. $nMov veículos em movimento."
-                else "Monitorando via.")
+                if (nMov > 0) config.trFormat("voice_monitor_road_moving", nMov)
+                else config.tr("voice_monitor_road"))
         }
     }
 

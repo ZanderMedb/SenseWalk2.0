@@ -12,6 +12,12 @@ class AppConfig(context: Context) {
     private val prefs: SharedPreferences =
         context.getSharedPreferences("travessia_config", Context.MODE_PRIVATE)
 
+
+    // ── Idioma ──
+    var appLanguage: String
+        get()  = prefs.getString("app_language", "pt") ?: "pt"
+        set(v) = prefs.edit().putString("app_language", v).apply()
+
     // ── Classes do modelo ──
     val keywordsVeiculos      = setOf("car", "motorcycle", "bicycle", "truck", "ambulance")
     val keywordsFaixa         = setOf("crosswalk")
@@ -20,12 +26,12 @@ class AppConfig(context: Context) {
     val kwVerde    = setOf("green")
     val kwAmarelo  = setOf("yellow")
 
-    val nomesPt = mapOf(
-        "car"        to "carro",
-        "motorcycle" to "moto",
-        "bicycle"    to "bicicleta",
-        "truck"      to "caminhão",
-        "ambulance"  to "ambulância"
+    private val chavesVeiculos = mapOf(
+        "car"        to "vehicle_car",
+        "motorcycle" to "vehicle_motorcycle",
+        "bicycle"    to "vehicle_bicycle",
+        "truck"      to "vehicle_truck",
+        "ambulance"  to "vehicle_ambulance"
     )
 
     val classNames = listOf(
@@ -141,6 +147,30 @@ class AppConfig(context: Context) {
         get()  = prefs.getFloat("volume_voz", 1.0f)
         set(v) = prefs.edit().putFloat("volume_voz", v).apply()
 
+
+
+    // ── Aparência / Interface ──
+    // Essas opções mudam apenas a aparência do app, sem alterar a lógica da IA.
+    var espPreviewTelaCheia: Boolean
+        get()  = prefs.getBoolean("esp_preview_tela_cheia", true)
+        set(v) = prefs.edit().putBoolean("esp_preview_tela_cheia", v).apply()
+
+    var espPreviewRotation: Int
+        get()  = prefs.getInt("esp_preview_rotation", 90)
+        set(v) = prefs.edit().putInt("esp_preview_rotation", v).apply()
+
+    var mostrarOverlay: Boolean
+        get()  = prefs.getBoolean("mostrar_overlay", true)
+        set(v) = prefs.edit().putBoolean("mostrar_overlay", v).apply()
+
+    var mostrarPainelSuperior: Boolean
+        get()  = prefs.getBoolean("mostrar_painel_superior", true)
+        set(v) = prefs.edit().putBoolean("mostrar_painel_superior", v).apply()
+
+    var mostrarPainelInferior: Boolean
+        get()  = prefs.getBoolean("mostrar_painel_inferior", true)
+        set(v) = prefs.edit().putBoolean("mostrar_painel_inferior", v).apply()
+
     // ── Estados ──
     companion object {
         const val EST_INATIVO      = "INATIVO"
@@ -171,8 +201,38 @@ class AppConfig(context: Context) {
         }
     }
 
-    fun nomeVeiculoPt(nomeClasse: String): String =
-        nomesPt[nomeClasse.lowercase().trim()] ?: "veículo"
+    fun tr(key: String): String = LanguageManager.text(appLanguage, key)
+
+    fun trFormat(key: String, vararg args: Any): String =
+        tr(key).format(*args)
+
+    fun nomeVeiculo(nomeClasse: String): String {
+        val key = chavesVeiculos[nomeClasse.lowercase().trim()] ?: "object_vehicle"
+        return tr(key)
+    }
+
+    // Mantido para compatibilidade com arquivos antigos.
+    fun nomeVeiculoPt(nomeClasse: String): String = nomeVeiculo(nomeClasse)
+
+    fun nomeCorSemaforo(cor: String): String {
+        return when (cor) {
+            "VERMELHO" -> tr("color_red")
+            "VERDE" -> tr("color_green")
+            "AMARELO" -> tr("color_yellow")
+            "DESCONHECIDO" -> tr("color_unknown")
+            "NENHUM" -> tr("color_none")
+            else -> cor
+        }
+    }
+
+    fun sufixoMovimento(classif: String): String {
+        return when (classif) {
+            "PARADO" -> tr("motion_stopped_short")
+            "EM_MOVIMENTO" -> tr("motion_moving_short")
+            "APROXIMANDO" -> tr("motion_approaching_short")
+            else -> ""
+        }
+    }
 
     fun dentroRoi(cx: Float, cy: Float, w: Int, h: Int): Boolean {
         if (!roiAtivo) return true
@@ -191,5 +251,8 @@ class AppConfig(context: Context) {
         }
     }
 
-    fun resetarParaPadrao() = prefs.edit().clear().apply()
+    fun resetarParaPadrao() {
+        val idiomaAtual = appLanguage
+        prefs.edit().clear().putString("app_language", idiomaAtual).apply()
+    }
 }

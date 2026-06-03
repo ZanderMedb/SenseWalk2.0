@@ -2,15 +2,17 @@ package com.travessia.segura.camera
 
 import android.graphics.Bitmap
 import android.util.Log
-import androidx.camera.core.ImageAnalysis
-import androidx.camera.core.ImageProxy
 import com.travessia.segura.config.AppConfig
 import com.travessia.segura.detection.*
 import com.travessia.segura.logic.StateMachine
 import com.travessia.segura.tracking.Rastreador
 import com.travessia.segura.ui.OverlayView
 
-class FrameAnalyzer(
+/**
+ * Processa frames vindos do ESP32 (Bitmap direto, sem ImageProxy).
+ * Equivalente ao FrameAnalyzer mas para fonte HTTP.
+ */
+class EspFrameProcessor(
     private val config: AppConfig,
     private val detector: YoloDetector,
     private val iouTracker: SimpleIoUTracker,
@@ -18,61 +20,48 @@ class FrameAnalyzer(
     private val stateMachine: StateMachine,
     private val onStatusUpdate: (String, String, Int, String) -> Unit,
     private val onOverlayUpdate: (List<OverlayView.BoxInfo>, Int, Int, Int) -> Unit
-) : ImageAnalysis.Analyzer {
-
+) {
     companion object {
-        private const val TAG = "FrameAnalyzer"
+        private const val TAG = "EspFrameProcessor"
     }
 
     private var frameCount = 0L
 
-    override fun analyze(imageProxy: ImageProxy) {
-        if (stateMachine.estado == AppConfig.EST_INATIVO) {
-            imageProxy.close()
-            return
-        }
-
-        if (!detector.isReady) {
-            imageProxy.close()
-            return
-        }
+    /**
+     * Processa um frame Bitmap vindo do ESP32.
+     * Chamado na thread principal - o processamento pesado (detecção) é síncrono aqui,
+     * então idealmente chame de uma thread/coroutine de background.
+     */
+    fun processarFrame(bitmap: Bitmap) {
+        if (stateMachine.estado == AppConfig.EST_INATIVO) return
+        if (!detector.isReady) return
 
         try {
-            val rotation = imageProxy.imageInfo.rotationDegrees
-            val bitmap = ImageUtils.imageProxyToBitmap(imageProxy) ?: run {
-                imageProxy.close()
-                return
-            }
-
-            processarFrame(bitmap, rotation)
-            bitmap.recycle()
-
+            processarInterno(bitmap)
         } catch (e: Exception) {
-            Log.e(TAG, "Erro ao processar frame: ${e.message}")
-        } finally {
-            imageProxy.close()
+            Log.e(TAG, "Erro ao processar frame ESP: ${e.message}")
         }
     }
 
-    private fun processarFrame(bitmap: Bitmap, rotation: Int) {
+    private fun processarInterno(bitmap: Bitmap) {
         frameCount++
         val agora = System.currentTimeMillis() / 1000.0
 
-        val wf = if (rotation == 90 || rotation == 270) bitmap.height else bitmap.width
-        val hf = if (rotation == 90 || rotation == 270) bitmap.width  else bitmap.height
+        val wf = bitmap.width
+        val hf = bitmap.height
 
-        // 1. Detecção YOLO
-        val rawDetections = detector.detectar(bitmap, config.confMinima, rotation)
+        // 1. Detecção YOLO (sem rotação pois o ESP já envia na orientação correta)
+        val rawDetections = detector.detectar(bitmap, config.confMinima, 0)
 
         // 2. Tracking IoU
         val tracked = iouTracker.update(rawDetections)
 
         // 3. Separar categorias
-        val veiculos    = mutableMapOf<Int, VeiculoInfo>()
-        var faixaDet    = false
+        val veiculos = mutableMapOf<Int, VeiculoInfo>()
+        var faixaDet = false
         var faixaCentroX = -1f
         var semCorFrame = "NENHUM"
-        var nSemId      = 0
+        var nSemId = 0
 
         val overlayBoxes = mutableListOf<OverlayView.BoxInfo>()
 
@@ -83,15 +72,14 @@ class FrameAnalyzer(
             if (!config.dentroRoi(cx, cy, wf, hf)) continue
 
             when (config.categorizarClasse(det.className)) {
-
                 "faixa" -> {
-                    faixaDet     = true
+                    faixaDet = true
                     faixaCentroX = cx
                     overlayBoxes.add(OverlayView.BoxInfo(
                         x1 = det.x1, y1 = det.y1, x2 = det.x2, y2 = det.y2,
-                        label      = config.tr("object_crosswalk"),
+                        label = config.tr("object_crosswalk"),
                         confidence = det.confidence,
-                        color      = OverlayView.COLOR_FAIXA
+                        color = OverlayView.COLOR_FAIXA
                     ))
                 }
 
@@ -100,15 +88,15 @@ class FrameAnalyzer(
                     if (cor != "DESCONHECIDO") semCorFrame = cor
                     val semColor = when (cor) {
                         "VERMELHO" -> OverlayView.COLOR_SEM_VERMELHO
-                        "VERDE"    -> OverlayView.COLOR_SEM_VERDE
-                        "AMARELO"  -> OverlayView.COLOR_SEM_AMARELO
-                        else       -> OverlayView.COLOR_SEM_OUTRO
+                        "VERDE" -> OverlayView.COLOR_SEM_VERDE
+                        "AMARELO" -> OverlayView.COLOR_SEM_AMARELO
+                        else -> OverlayView.COLOR_SEM_OUTRO
                     }
                     overlayBoxes.add(OverlayView.BoxInfo(
                         x1 = det.x1, y1 = det.y1, x2 = det.x2, y2 = det.y2,
-                        label      = config.nomeCorSemaforo(cor).replaceFirstChar { it.uppercase() },
+                        label = config.nomeCorSemaforo(cor).replaceFirstChar { it.uppercase() },
                         confidence = det.confidence,
-                        color      = semColor
+                        color = semColor
                     ))
                 }
 
@@ -120,27 +108,27 @@ class FrameAnalyzer(
                     val (classif, vel) = tracker.classificar(tid, wf, hf)
 
                     veiculos[tid] = VeiculoInfo(
-                        nome   = det.className,
-                        conf   = det.confidence,
-                        cx     = cx, cy = cy,
+                        nome = det.className,
+                        conf = det.confidence,
+                        cx = cx, cy = cy,
                         classif = classif,
-                        vel    = vel,
-                        bbox   = floatArrayOf(det.x1, det.y1, det.x2, det.y2),
-                        bboxW  = det.bboxW,
-                        tid    = tid
+                        vel = vel,
+                        bbox = floatArrayOf(det.x1, det.y1, det.x2, det.y2),
+                        bboxW = det.bboxW,
+                        tid = tid
                     )
 
                     val boxColor = when (classif) {
-                        "APROXIMANDO"  -> OverlayView.COLOR_APROXIMANDO
+                        "APROXIMANDO" -> OverlayView.COLOR_APROXIMANDO
                         "EM_MOVIMENTO" -> OverlayView.COLOR_EM_MOVIMENTO
-                        else           -> OverlayView.COLOR_PARADO
+                        else -> OverlayView.COLOR_PARADO
                     }
                     val sufixo = config.sufixoMovimento(classif)
                     overlayBoxes.add(OverlayView.BoxInfo(
                         x1 = det.x1, y1 = det.y1, x2 = det.x2, y2 = det.y2,
-                        label      = "${config.nomeVeiculo(det.className)} $sufixo",
+                        label = "${config.nomeVeiculo(det.className)} $sufixo",
                         confidence = det.confidence,
-                        color      = boxColor
+                        color = boxColor
                     ))
                 }
             }
@@ -148,18 +136,19 @@ class FrameAnalyzer(
 
         tracker.limpar(agora)
 
-        // 4. Atualizar overlay
-        onOverlayUpdate(overlayBoxes, wf, hf, 0)
+        // 4. Atualizar overlay usando apenas a rotação visual configurada.
+        // A inferência da IA continua igual, sem alterar a lógica do modelo.
+        onOverlayUpdate(overlayBoxes, wf, hf, config.espPreviewRotation)
 
         // 5. Atualizar StateMachine
         stateMachine.processar(
             veiculosReais = veiculos,
-            nSemId        = nSemId,
-            semCorFrame   = semCorFrame,
-            faixaDet      = faixaDet,
-            faixaCx       = faixaCentroX,
-            wf            = wf,
-            hf            = hf
+            nSemId = nSemId,
+            semCorFrame = semCorFrame,
+            faixaDet = faixaDet,
+            faixaCx = faixaCentroX,
+            wf = wf,
+            hf = hf
         )
 
         // 6. Notificar UI
